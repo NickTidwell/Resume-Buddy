@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Resume{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h1>Welcome to Resume-Buddy</h1>
+        <p>Your go-to tool for easy resume parsing and analysis. Upload your resume to get started and let Resume-Buddy do the rest!</p>
+        <form action="/uploadV2" method="post" enctype="multipart/form-data" id="upload-form">
+            <input type="file" name="resume" class="file-input" id="file-input" required>
+            <button type="button" class="upload-btn" id="upload-btn">Upload Your Resume</button>
+        </form>
+        <div class="spinner" id="spinner">
+            <img src="{{ url_for('static', filename='gif/spinner.gif') }}" alt="Loading...">
+        </div>
+    </div>
+    <script>
+        document.getElementById('upload-btn').addEventListener('click', function() {
+            document.getElementById('file-input').click();
+        });
+
+        document.getElementById('file-input').addEventListener('change', function() {
+            if (document.getElementById('file-input').files.length > 0) {
+                document.getElementById('spinner').style.display = 'block';
+                document.getElementById('upload-form').submit();
+                resetForm();
+            }
+        });
+
+        // Function to reset the form
+        function resetForm() {
+            document.getElementById('upload-form').reset();
+            document.getElementById('spinner').style.display = 'none';
+        }
+    </script>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Job and Resume Details{% endblock %}
+
+{% block content %}
+<div class="container" id="original-content">
+    <h1>Job and Resume Details</h1>
+    <p><strong>Selected Job:</strong> {{job_data.company}} : {{ job_data.job_title }}</p>
+    <p><strong>Resume Path:</strong> {{ resume }}</p>
+    <button class="upload-btn" onclick="beginAligning()">Begin Aligning</button>
+
+    <!-- Spinner for processing -->
+    <div id="spinner" style="display: none;">
+        <img src="{{ url_for('static', filename='gif/spinner.gif') }}" alt="Loading..." />
+        <p>Processing, please wait...</p>
+    </div>
+</div>
+
+<div id="result" style="display: none;">
+    <h2>Alignment Result</h2>
+    <pre id="json-result" style="background-color: #f4f4f4; padding: 10px; border-radius: 5px;"></pre>
+</div>
+
+<script>
+    function beginAligning() {
+        // Show the spinner
+        document.getElementById('spinner').style.display = 'block';
+        document.getElementById('result').style.display = 'none'; // Hide the result section
+
+        const queryString = window.location.search;
+        const urlParams = new URLSearchParams(queryString);
+        const jobData = urlParams.get('job_data');
+
+        fetch('/align-skills', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ data: jobData })
+        })
+        .then(response => {
+            if (response.redirected) {
+                window.location.href = response.url;
+            } else {
+                return response.json();
+            }
+        })
+        .then(data => {
+            // Hide the spinner and show the result
+            document.getElementById('spinner').style.display = 'none';
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('json-result').textContent = JSON.stringify(data, null, 2);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            // Hide the spinner in case of an error
+            document.getElementById('spinner').style.display = 'none';
+        });
+    }
+</script>
+{% endblock %}

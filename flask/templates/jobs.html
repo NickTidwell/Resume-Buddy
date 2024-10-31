@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Job Listings{% endblock %}
+
+{% block content %}
+<style>
+    .job {
+        border: 1px solid #ccc;
+        padding: 15px;
+        margin: 15px 0;
+        position: relative;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    .job:hover {
+        background-color: #e0f7ff;
+    }
+    .job-title {
+        font-size: 1.5em;
+        margin-bottom: 10px;
+    }
+    .company {
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+    .description {
+        display: none;
+        margin-bottom: 10px;
+    }
+    .link {
+        color: #0073b1;
+        text-decoration: none;
+    }
+    .pagination {
+        margin: 20px 0;
+    }
+    .pagination a {
+        margin: 0 5px;
+        text-decoration: none;
+        color: #0073b1;
+    }
+    .pagination a.active {
+        font-weight: bold;
+    }
+    .select-button {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+    }
+    .expand-button {
+        margin-bottom: 10px;
+        cursor: pointer;
+        color: #0073b1;
+        background: none;
+        border: none;
+        font-size: 1em;
+        text-decoration: underline;
+    }
+    .preview {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        margin-bottom: 10px;
+    }
+</style>
+<script>
+    function logJobSelection(jobTitle) {
+        console.log("Selected job:", jobTitle);
+    }
+
+    function toggleDescription(id) {
+        var description = document.getElementById(id);
+        var preview = document.getElementById('preview-' + id);
+        if (description.style.display === "none") {
+            description.style.display = "block";
+            preview.style.display = "none";
+        } else {
+            description.style.display = "none";
+            preview.style.display = "block";
+        }
+    }
+    function selectJob(job) {
+        console.log(JSON.stringify(job))
+        fetch('/select_job', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(job)
+        })
+        .then(response => {
+        if (response.redirected) {
+            window.location.href = response.url;
+        }
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+    });
+    }
+
+</script>
+
+<h1>Job Listings</h1>
+{% if jobs %}
+    {% for job in jobs %}
+    <div class="job" onclick="selectJob({{ job }})">
+        <div class="job-title">{{ job.job_title }}</div>
+        <div class="company">{{ job.company }}</div>
+        <div class="preview" id="preview-description-{{ loop.index }}">{{ job.description }}</div>
+        <button class="expand-button" onclick="toggleDescription('description-{{ loop.index }}'); event.stopPropagation();">Expand</button>
+        <div class="description" id="description-{{ loop.index }}">{{ job.description }}</div>
+        <a class="link" href="{{ job.href }}" target="_blank">View Job</a>
+    </div>
+    {% endfor %}
+    <div class="pagination">
+        {% if page > 1 %}
+            <a href="/jobs?page={{ page - 1 }}">Previous</a>
+        {% endif %}
+        {% for p in range(1, (total // per_page) + 2) %}
+            <a href="/jobs?page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+        {% endfor %}
+        {% if page < (total // per_page) + 1 %}
+            <a href="/jobs?page={{ page + 1 }}">Next</a>
+        {% endif %}
+    </div>
+{% else %}
+    <p>No job listings available.</p>
+{% endif %}
+{% endblock %}
