@@ -5,7 +5,10 @@ import os
 load_dotenv()
 model_name = os.getenv("MODEL_NAME")
 api_key = os.getenv("API_KEY")
-api_type = LLMClientType.HUGGINGFACE #api_type = LLMClientType.OPENAI
+model_type = os.getenv("MODEL_TYPE")
+api_type = LLMClientType.HUGGINGFACE
+if model_type == "openai":
+    api_type = LLMClientType.OPENAI #api_type = LLMClientType.OPENAI
 client = LLMGetClient(api_type, api_key)
 
 
@@ -57,8 +60,8 @@ def extract_job_experiences(job_description ):
     """
 
     system_message = """
-        You are an advanced language model tasked with extracting key components from a resume based on a given job description. Your objective is to categorize experiences into "Technical Skills," "Professional Experience," "Educational Background," "Soft Skills," "Industry Knowledge," and "Other Requirements." Ensure that each category is concise and relevant to the job description. If a category is not explicitly mentioned, infer the key components to the best of your ability, without adding any extra explanations.
-        """
+    You are an advanced language model tasked with extracting key components from a resume based on a given job description. Your objective is to categorize experiences into "Technical Skills," "Professional Experience," "Educational Background," "Soft Skills," "Industry Knowledge," and "Other Requirements." Ensure that each category is concise and relevant to the job description. If a category is not explicitly mentioned, infer the key components to the best of your ability, without adding any extra explanations
+    """
 
     messages = [ 
         {"role": "system", "content": system_message}, 
@@ -76,9 +79,7 @@ def extract_aligned_experiences(extracted_key_experiences, resume_bullet_points 
     {resume_bullet_points}
     """
     system_message = """
-    You are an expert language model tasked with updating only the "experience" section of a resume based on key skills and experiences extracted from job descriptions. Each bullet point should be relevant, impactful, and clearly reflect the skills and experiences described in the key experiences. Output the revised "experience" section in JSON format, with no additional explanations, and keep Resume Bullet Points formatting.
-    """
-
+    You are an expert language model tasked with updating only the "experience" section of a resume based on key skills and experiences extracted from job descriptions. Each bullet point should be relevant, impactful, and clearly reflect the skills and experiences described in the key experiences. Ensure that each bullet point highlights specific achievements, quantifiable results, and the direct impact of the candidate's contributions. Emphasize the diversity of technologies and frameworks used, and ensure that the updated experience section demonstrates a broad and varied skill set. Output the revised "experience" section in JSON format, with no additional explanations. Do not change the structure, order, or formatting of the JSON. Only update the text within the existing structure. Do not add any additional text or comments. Ensure the JSON is valid and properly formatted."""
     messages = [ 
         {"role": "system", "content": system_message}, 
         {"role": "user", "content": template}, 
@@ -96,7 +97,7 @@ def extract_projects_experiences(extracted_key_experiences, resume_bullet_points
     """
 
     system_message = """
-    You are an expert language model tasked with updating only the "projects" section of a resume based on key skills and experiences extracted from job descriptions. Each bullet point should be relevant, impactful, and clearly reflect the skills and experiences described in the key experiences. Output the revised "projects" section in JSON format, with no additional explanations, and keep Resume Bullet Points formatting.
+    You are an advanced language model tasked with extracting key components from a resume based on a given job description. Your objective is to categorize experiences into "Technical Skills," "Professional Experience," "Educational Background," "Soft Skills," "Industry Knowledge," and "Other Requirements." Ensure that each category is concise and relevant to the job description. Highlight specific achievements, quantifiable results, and the direct impact of the candidate's contributions. Emphasize the diversity of technologies and frameworks used, and ensure that the summarized experiences demonstrate a broad and varied skill set. If a category is not explicitly mentioned, infer the key components to the best of your ability, without adding any extra explanations.
     """
 
 
@@ -161,4 +162,59 @@ def execute_prompt(job_description, user_skills):
 
     combined_json = {**new_skills_json, **align_experience_json, **align_projects_json, **user_education_json}
     combined_str = json.dumps(combined_json, indent=4)
-    return combined_str
+    return combined_str, extracted_experiences
+
+def execute_update_prompt(resume_str, llm_query):
+    template = f"""
+    Resume:
+    {resume_str}
+
+    Query:
+    {llm_query}
+    """
+
+    system_message = """
+    You are an AI assistant that helps users update their resumes. You will receive a resume in JSON format and a query specifying the updates needed. Your task is to apply the updates to the resume and return the updated resume in the same JSON format. 
+    Do not change the structure or formatting of the JSON. Only update the text as specified in the query. Do not add any additional text or comments.    """
+
+    messages = [ 
+        {"role": "system", "content": system_message}, 
+        {"role": "user", "content": template}, 
+    ]
+    output = client.generate_output(model_name, messages)
+    output = extract_between(output, "```json", "```")
+    return output
+
+def parse_evaluation_output(output):
+    try:
+        stats = json.loads(output)
+        return stats
+    except json.JSONDecodeError as e:
+        return {"error": f"Invalid JSON output: {e}"}
+    return stats
+
+def evaluate_resume_to_job(job_desc, original, updated):
+    template = f"""
+    Resume One:
+    {original}
+
+    Resume Two:
+    {updated}
+    """
+
+    system_message = """
+    You are an AI assistant that evaluates resumes against a job description. You will receive a job description and two resumes. Your task is to compare the resumes and determine which one is a better fit for the job description. Output the result in the following JSON format:
+    
+    {
+        "choice": "one", "two", or "no vote",
+        "explanation": "Brief explanation of why the chosen resume is a better fit."
+    }
+    """
+
+    messages = [ 
+        {"role": "system", "content": system_message}, 
+        {"role": "user", "content": template}, 
+    ]
+
+    output = client.generate_output(model_name, messages)
+    return extract_between(json.dumps(parse_evaluation_output(output)), "```json", "```") 

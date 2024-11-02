@@ -3,16 +3,42 @@
 {% block title %}Comparison Result{% endblock %}
 
 {% block content %}
-<h1>Comparison Result</h1>
-<div style="display: flex; font-family: monospace;">
-    <div style="width: 50%; border-right: 1px solid #ccc; padding: 10px; box-sizing: border-box;">
-        <h2>Original Text</h2>
-        <div style="white-space: pre-wrap;">{{ original | safe }}</div>
+<h1 style="text-align: center; color: #333;">Comparison Result</h1>
+<div style="background-color: #f0f0f0; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+    <h2 style="color: #0073b1;">Ask for Updates</h2>
+    <form id="update-form" action="/update" method="post" style="display: flex; flex-direction: column; gap: 10px;">
+        <input type="hidden" id="original-input" name="original">
+        <input type="hidden" id="new-html-input" name="new-html">
+        <label for="update-query" style="font-weight: bold;">Enter your query:</label>
+        <input type="text" id="update-query" name="update-query" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+        <button type="submit" style="background-color: #0073b1; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s;">Submit</button>
+    </form>
+</div>
+<div id="spinner" style="display: none; text-align: center; margin-top: 20px;">
+    <img src="{{ url_for('static', filename='gif/spinner.gif') }}" alt="Loading..." />
+    <p>Processing, please wait...</p>
+</div>
+<div style="display: flex; gap: 20px; font-family: monospace; margin-top: 20px;">
+    <div style="width: 50%; border: 1px solid #ccc; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+        <h2 style="color: #0073b1;">Original Text</h2>
+        <div id="original-content" style="white-space: pre-wrap;">{{ original | safe }}</div>
     </div>
-    <div style="width: 50%; padding: 10px; box-sizing: border-box;">
-        <h2>Updated Text</h2>
-        <div style="white-space: pre-wrap;">{{ new | safe }}</div>
+    <div style="width: 50%; border: 1px solid #ccc; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+        <h2 style="color: #0073b1;">Updated Text</h2>
+        <div id="new-html-content" style="white-space: pre-wrap;">{{ new | safe }}</div>
     </div>
 </div>
-<a href="/">Compare Another</a>
+<a href="/" style="display: block; text-align: center; margin-top: 20px; color: #0073b1; text-decoration: none; font-weight: bold;">Compare Another</a>
+
+<script>
+    document.getElementById('update-form').addEventListener('submit', function(event) {
+        var originalContent = document.getElementById('original-content').innerText;
+        var newHtmlContent = document.getElementById('new-html-content').innerText;
+        document.getElementById('original-input').value = originalContent;
+        document.getElementById('new-html-input').value = newHtmlContent;
+
+        // Show the spinner
+        document.getElementById('spinner').style.display = 'block';
+    });
+</script>
 {% endblock %}

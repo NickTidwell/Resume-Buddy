@@ -1,10 +1,11 @@
 import numpy as np
+import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from nltk.translate.bleu_score import sentence_bleu
 from sklearn.metrics import f1_score
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
-
+from helpers.KeySkillsChainApi import evaluate_resume_to_job
 def compute_cosine_similarity(doc1, doc2):
     vectorizer = TfidfVectorizer()
     tfidf_matrix = vectorizer.fit_transform([doc1, doc2])
@@ -34,6 +35,97 @@ def compute_f1_score(reference, candidate):
     recall = true_positive / len(reference_words) if reference_words else 0
     f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0
     return f1
+def get_stat_average(jsonl_file):
+    with open(jsonl_file, 'r') as file:
+        original_bleu, original_cosine, original_f1 = 0, 0, 0
+        new_bleu, new_cosine, new_f1 = 0, 0, 0
+        total = 0
+        
+        for entry in file:
+            data = json.loads(entry)
+            reference = json.dumps(data['description'])
+            original =  json.dumps(data["input"])
+            output =  json.dumps(data['output'])
+            original_bleu += compute_bleu_score(reference, original)
+            original_cosine += compute_cosine_similarity(reference, original)
+            original_f1 += compute_f1_score(reference, original)
+            
+            new_bleu += compute_bleu_score(reference, output)
+            new_cosine += compute_cosine_similarity(reference, output)
+            new_f1 += compute_f1_score(reference, output)
+            
+            total += 1
+        
+        if total == 0:
+            return "No data to process."
+        
+        bleu_og_average = original_bleu / total
+        f1_og_avg = original_f1 / total
+        cosine_og_avg = original_cosine / total
+
+        bleu_new_avg = new_bleu / total
+        f1_new_avg = new_f1 / total
+        cosine_new_avg = new_cosine / total
+
+        summary = (
+            f"Original Averages:\n"
+            f"BLEU: {bleu_og_average:.2f}\n"
+            f"Cosine Similarity: {cosine_og_avg:.2f}\n"
+            f"F1 Score: {f1_og_avg:.2f}\n\n"
+            f"New Averages:\n"
+            f"BLEU: {bleu_new_avg:.2f}\n"
+            f"Cosine Similarity: {cosine_new_avg:.2f}\n"
+            f"F1 Score: {f1_new_avg:.2f}"
+        )
+        
+        print(summary)
+
+def get_llm_score(jsonl_file):
+    count_one = 0
+    count_two = 0
+    total_entries = 0
+    count_error = 0
+    count_no_vote = 0
+
+    with open(jsonl_file, 'r') as file:
+        for entry in file:
+            data = json.loads(entry)
+            reference = json.dumps(data['description'])
+            original = json.dumps(data["input"])
+            output = json.dumps(data['output'])
+            
+
+            parsed_result = json.loads(evaluate_resume_to_job(reference, original, output))
+            
+            if parsed_result.get("choice") == "one":
+                count_one += 1
+            elif parsed_result.get("choice") == "two":
+                count_two += 1
+            elif parsed_result.get("choice") == "no vote":
+                count_no_vote += 1
+            else :
+                count_error += 1
+            total_entries += 1
+
+    # Calculate percentages
+    if total_entries > 0:
+        percentage_one = (count_one / total_entries) * 100
+        percentage_two = (count_two / total_entries) * 100
+        percentage_error = (count_error / total_entries) * 100
+        percentage_no_vote = (count_no_vote / total_entries) * 100
+    else:
+        percentage_one = 0
+        percentage_two = 0
+        percentage_error = 0
+        percentage_error = 0
+
+    # Print summary
+    print(f"Total entries: {total_entries}")
+    print(f"Number of 'one' choices: {count_one} ({percentage_one:.2f}%)")
+    print(f"Number of 'two' choices: {count_two} ({percentage_two:.2f}%)")
+    print(f"Number of 'no vote' choices: {count_no_vote} ({percentage_no_vote:.2f}%)")
+    print(f"Number of 'error' choices: {count_error} ({percentage_error:.2f}%)")
+
 def summarize_resume_metrics(cleaned_description, original_resume, updated_resume):
     # Compute metrics for original and updated resumes
     metrics = {

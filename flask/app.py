@@ -1,6 +1,6 @@
 from werkzeug.utils import secure_filename
 from helpers.utility import allowed_file, append_llm_output
-from helpers.KeySkillsChainApi import execute_prompt
+from helpers.KeySkillsChainApi import execute_prompt, execute_update_prompt
 from helpers.metrics import summarize_resume_metrics
 from helpers.ResumeParser import ResumeParser
 from helpers.WordcCompare import compare_strings, generate_html_diff
@@ -54,7 +54,6 @@ def align():
 @app.route('/align-skills', methods=['POST'])
 def align_skills():
     resume_path = session.get('resume-path')  # Retrieve job data from session
-
     parser = ResumeParser(resume_path)
     parser.parse()
     resume_str = parser.as_str()
@@ -63,17 +62,18 @@ def align_skills():
     job_data = request.get_json()
     description = json.loads(job_data['data'])['description']
     cleaned_description = re.sub(r'[^A-Za-z0-9 ]+', '', description.replace('\n', ' '))
-    prompt_out = execute_prompt(job_description=cleaned_description, user_skills=resume_str)
+    prompt_out, desc_summary = execute_prompt(job_description=cleaned_description, user_skills=resume_str)
     output_data = json.loads(prompt_out)
     input_data = json.loads(resume_str)
 
     # Combine into a new dictionary with "output" and "input" headers
     combined_data = {
         "output": output_data,
-        "input": input_data
+        "input": input_data,
+        "description": desc_summary
     }
     summarize_resume_metrics(cleaned_description, resume_str, prompt_out)
-    append_llm_output(app.config["OUTPUT_PATH"], json.dumps(combined_data, indent=4))
+    append_llm_output(app.config["OUTPUT_PATH"], json.dumps(combined_data))
     return redirect(url_for('compare', original=resume_str, new=prompt_out))
 
 @app.route('/compare')
@@ -86,7 +86,21 @@ def compare():
     return render_template('compare.html', original=original_html, new=new_html)
 
 
+@app.route('/update', methods=['POST'])
+def update():
+    query = request.form.get('update-query')
+    new_html = request.form.get('new-html')
 
+    resume_path = session.get('resume-path')  # Retrieve job data from session
+    parser = ResumeParser(resume_path)
+    parser.parse()
+    resume_str = parser.as_str()
+
+    updated_output = execute_update_prompt(new_html, query)
+    updated_output = json.loads(updated_output)
+    updated_output = json.dumps(updated_output, indent=4)
+    # Redirect back to the compare page with the updated new_html
+    return redirect(url_for('compare', original=resume_str, new=updated_output))
 @app.route('/')
 def index():
     return render_template('index.html', pages=pages)

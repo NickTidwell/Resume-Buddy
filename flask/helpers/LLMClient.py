@@ -37,7 +37,7 @@ class HuggingFaceClient(BaseClient):
         payload = {
             "model": model,
             "messages": messages,
-            "max_tokens": 1000,
+            "max_tokens": 2048,
             "stream": True
         }
         
