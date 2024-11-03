@@ -62,6 +62,17 @@
         white-space: nowrap;
         margin-bottom: 10px;
     }
+    .highlight {
+        background-color: #d1e7dd;
+        border-color: #0f5132;
+        padding: 20px;
+        border-radius: 5px;
+    }
+    .highlight-note {
+        font-size: 0.9em;
+        color: #0f5132;
+        margin-bottom: 10px;
+    }
 </style>
 <script>
     function logJobSelection(jobTitle) {
@@ -103,7 +114,10 @@
 <h1>Job Listings</h1>
 {% if jobs %}
     {% for job in jobs %}
-    <div class="job" onclick="selectJob({{ job }})">
+    <div class="job {% if loop.index <= 4 %}highlight{% endif %}" onclick="selectJob({{ job }})">
+        {% if loop.index <= 4 %}
+        <div class="highlight-note">Recommended by Retrieval Augmented Generation</div>
+        {% endif %}
         <div class="job-title">{{ job.job_title }}</div>
         <div class="company">{{ job.company }}</div>
         <div class="preview" id="preview-description-{{ loop.index }}">{{ job.description }}</div>

@@ -8,6 +8,9 @@ from flask import Flask, request, redirect, url_for, render_template, session
 import os
 import re
 import json
+from langchain_community.document_loaders import JSONLoader
+from langchain.embeddings.sentence_transformer import SentenceTransformerEmbeddings
+from langchain_community.vectorstores import Chroma
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads/'
@@ -15,11 +18,14 @@ app.config['ALLOWED_EXTENSIONS'] = {'txt', 'docx'}
 app.secret_key = 'your_secret_key'  # Set a secret key for session management
 app.config["OUTPUT_PATH"] = 'outputs/output.jsonl'
 
-
+embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+loader = JSONLoader(file_path="./jobs.json", jq_schema=".jobs[].description", text_content=False)
+documents = loader.load()
+db = Chroma.from_documents(documents, embedding_function)
 def load_jobs():
     with open('jobs.json') as f:
-        jobs = json.load(f)
-        return jobs
+        jobs = json.load(f)['jobs']
+        return jobs, db
 pages = [
         {"name": "Home", "url": "/"},
         {"name": "Jobs", "url": "/jobs"},
@@ -28,7 +34,19 @@ pages = [
 
 @app.route('/jobs')
 def job_list():
-    jobs = load_jobs()
+    jobs, db= load_jobs()
+
+    resume_path = session.get('resume-path')  # Retrieve job data from session
+    parser = ResumeParser(resume_path)
+    parser.parse()
+    resume_str = parser.as_str()
+
+    docs = db.similarity_search(f"Select the best jobs for the candidate resume: {resume_str}")
+    db.
+    for doc in reversed(docs):
+        index = doc.metadata['seq_num']
+        item = jobs.pop(index)  # Remove the item at the given index
+        jobs.insert(0, item)    # Insert it at the front
     page = request.args.get('page', 1, type=int)
     per_page = 5
     total = len(jobs)
