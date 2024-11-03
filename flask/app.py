@@ -40,12 +40,12 @@ def job_list():
     parser = ResumeParser(resume_path)
     parser.parse()
     resume_str = parser.as_str()
+    docs = db.similarity_search(f"Select the best jobs for the candidate resume: {resume_str}", k=10)
 
-    docs = db.similarity_search(f"Select the best jobs for the candidate resume: {resume_str}")
-    db.
     for doc in reversed(docs):
         index = doc.metadata['seq_num']
         item = jobs.pop(index)  # Remove the item at the given index
+        item['recommended'] = 1
         jobs.insert(0, item)    # Insert it at the front
     page = request.args.get('page', 1, type=int)
     per_page = 5
