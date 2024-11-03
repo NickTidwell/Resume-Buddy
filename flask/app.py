@@ -1,9 +1,9 @@
 from werkzeug.utils import secure_filename
 from helpers.utility import allowed_file, append_llm_output
-from helpers.KeySkillsChainApi import execute_prompt, execute_update_prompt
+from helpers.KeySkillsChainApi import generate_resume_update, update_resume_with_query
 from helpers.metrics import summarize_resume_metrics
 from helpers.ResumeParser import ResumeParser
-from helpers.WordcCompare import compare_strings, generate_html_diff
+from helpers.WordCompare import compare_strings, generate_html_diff
 from flask import Flask, request, redirect, url_for, render_template, session
 import os
 import re
@@ -15,7 +15,6 @@ from langchain_community.vectorstores import Chroma
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads/'
 app.config['ALLOWED_EXTENSIONS'] = {'txt', 'docx'}
-app.secret_key = 'your_secret_key'  # Set a secret key for session management
 app.config["OUTPUT_PATH"] = 'outputs/output.jsonl'
 
 embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
@@ -26,17 +25,15 @@ def load_jobs():
     with open('jobs.json') as f:
         jobs = json.load(f)['jobs']
         return jobs, db
-pages = [
-        {"name": "Home", "url": "/"},
-        {"name": "Jobs", "url": "/jobs"},
-        # Add more pages as needed
-]
 
+pages = [
+    {"name": "Home", "url": "/"},
+    {"name": "Jobs", "url": "/jobs"},
+]
 @app.route('/jobs')
 def job_list():
-    jobs, db= load_jobs()
-
-    resume_path = session.get('resume-path')  # Retrieve job data from session
+    jobs, db = load_jobs()
+    resume_path = session.get('resume-path')
     parser = ResumeParser(resume_path)
     parser.parse()
     resume_str = parser.as_str()
@@ -44,9 +41,10 @@ def job_list():
 
     for doc in reversed(docs):
         index = doc.metadata['seq_num']
-        item = jobs.pop(index)  # Remove the item at the given index
+        item = jobs.pop(index)
         item['recommended'] = 1
-        jobs.insert(0, item)    # Insert it at the front
+        jobs.insert(0, item)
+    
     page = request.args.get('page', 1, type=int)
     per_page = 5
     total = len(jobs)
@@ -71,25 +69,24 @@ def align():
 
 @app.route('/align-skills', methods=['POST'])
 def align_skills():
-    resume_path = session.get('resume-path')  # Retrieve job data from session
+    resume_path = session.get('resume-path')
     parser = ResumeParser(resume_path)
     parser.parse()
     resume_str = parser.as_str()
 
-    # Convert job data to JSON string
     job_data = request.get_json()
     description = json.loads(job_data['data'])['description']
     cleaned_description = re.sub(r'[^A-Za-z0-9 ]+', '', description.replace('\n', ' '))
-    prompt_out, desc_summary = execute_prompt(job_description=cleaned_description, user_skills=resume_str)
+    
+    prompt_out, desc_summary = generate_resume_update(job_description=cleaned_description, resume_data=resume_str)
     output_data = json.loads(prompt_out)
     input_data = json.loads(resume_str)
-
-    # Combine into a new dictionary with "output" and "input" headers
     combined_data = {
         "output": output_data,
         "input": input_data,
         "description": desc_summary
     }
+    
     summarize_resume_metrics(cleaned_description, resume_str, prompt_out)
     append_llm_output(app.config["OUTPUT_PATH"], json.dumps(combined_data))
     return redirect(url_for('compare', original=resume_str, new=prompt_out))
@@ -114,7 +111,7 @@ def update():
     parser.parse()
     resume_str = parser.as_str()
 
-    updated_output = execute_update_prompt(new_html, query)
+    updated_output = update_resume_with_query(new_html, query)
     updated_output = json.loads(updated_output)
     updated_output = json.dumps(updated_output, indent=4)
     # Redirect back to the compare page with the updated new_html
@@ -123,8 +120,8 @@ def update():
 def index():
     return render_template('index.html', pages=pages)
 
-@app.route('/uploadV2', methods=['POST'])
-def upload_filev2():
+@app.route('/upload', methods=['POST'])
+def upload_file():
     if 'resume' not in request.files:
         return 'No file part'
     resume_file = request.files['resume']

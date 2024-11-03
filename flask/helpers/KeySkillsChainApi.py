@@ -9,17 +9,17 @@ model_type = os.getenv("MODEL_TYPE")
 api_type = LLMClientType.HUGGINGFACE
 if model_type == "openai":
     api_type = LLMClientType.OPENAI #api_type = LLMClientType.OPENAI
-client = LLMGetClient(api_type, api_key)
+llm_client = LLMGetClient(api_type, api_key)
 
 
-def extract_between(text, start_token, end_token):
+def extract_text_segment(text, start_token, end_token):
     start_index = text.find(start_token) + len(start_token)
     end_index = text.find(end_token, start_index)
     if start_index == -1 or end_index == -1:
         return text
     return text[start_index:end_index]
 
-def extract_job_skills(job_description ):
+def fetch_job_skills(job_description ):
     template = f"""
     Job Description:
     {job_description}
@@ -41,10 +41,10 @@ def extract_job_skills(job_description ):
         {"role": "system", "content": system_message}, 
         {"role": "user", "content": template}, 
     ] 
-    output = client.generate_output(model_name, messages)
+    output = llm_client.generate_output(model_name, messages)
     return output
 
-def extract_job_experiences(job_description ):
+def fetch_job_relevant_experience(job_description ):
     template = f"""
     Job Description:
     {job_description}
@@ -67,16 +67,16 @@ def extract_job_experiences(job_description ):
         {"role": "system", "content": system_message}, 
         {"role": "user", "content": template}, 
     ]
-    output = client.generate_output(model_name, messages)
+    output = llm_client.generate_output(model_name, messages)
     return output
 
-def extract_aligned_experiences(extracted_key_experiences, resume_bullet_points ):
+def align_experience_with_job(extracted_experience, resume_experiences ):
     template = f"""
     Extracted Key Experiences:
-    {extracted_key_experiences}
+    {extracted_experience}
 
     Resume Bullet Points:
-    {resume_bullet_points}
+    {resume_experiences}
     """
     system_message = """
     You are an expert language model tasked with updating only the "experience" section of a resume based on key skills and experiences extracted from job descriptions. Each bullet point should be relevant, impactful, and clearly reflect the skills and experiences described in the key experiences. Ensure that each bullet point highlights specific achievements, quantifiable results, and the direct impact of the candidate's contributions. Emphasize the diversity of technologies and frameworks used, and ensure that the updated experience section demonstrates a broad and varied skill set. Output the revised "experience" section in JSON format, with no additional explanations. Do not change the structure, order, or formatting of the JSON. Only update the text within the existing structure. Do not add any additional text or comments. Ensure the JSON is valid and properly formatted."""
@@ -84,16 +84,16 @@ def extract_aligned_experiences(extracted_key_experiences, resume_bullet_points 
         {"role": "system", "content": system_message}, 
         {"role": "user", "content": template}, 
     ]
-    output = client.generate_output(model_name, messages)
+    output = llm_client.generate_output(model_name, messages)
     return output
 
-def extract_projects_experiences(extracted_key_experiences, resume_bullet_points ):
+def align_projects_with_job(extracted_experience, resume_projects ):
     template = f"""
     Extracted Key Experiences:
-    {extracted_key_experiences}
+    {extracted_experience}
 
     Resume Bullet Points:
-    {resume_bullet_points}
+    {resume_projects}
     """
 
     system_message = """
@@ -105,10 +105,10 @@ def extract_projects_experiences(extracted_key_experiences, resume_bullet_points
         {"role": "system", "content": system_message}, 
         {"role": "user", "content": template}, 
     ]
-    output = client.generate_output(model_name, messages)
+    output = llm_client.generate_output(model_name, messages)
     return output
 
-def combine_skills(existing_skills, new_skills):
+def merge_skills(existing_skills, new_skills):
     languages_set = set(existing_skills["skills"]["languages:"].split(", "))
     technologies_set = set(existing_skills["skills"]["technologies:"].split(", "))
     frameworks_set = set(existing_skills["skills"]["frameworks:"].split(", "))
@@ -127,50 +127,49 @@ def combine_skills(existing_skills, new_skills):
     }
     return combined_skills
 
-def execute_prompt(job_description, user_skills):
-    usr_json = json.loads(user_skills)
-    experiences =  json.dumps({"experience": usr_json.get("experience", {})})
-    user_projects = json.dumps({"projects": usr_json.get("projects", {})})
-    user_education_json = {"education": usr_json.get("education", {})}
+def generate_resume_update(job_description, resume_data):
+    parsed_resume = json.loads(resume_data)
+    experience_section = json.dumps({"experience": parsed_resume.get("experience", {})})
+    project_section = json.dumps({"projects": parsed_resume.get("projects", {})})
+    education_section = {"education": parsed_resume.get("education", {})}
 
-    desc_skills_str = extract_job_skills(job_description)
-    extracted_desc = extract_between(desc_skills_str, "```json", "```")
-    new_json = json.loads(extracted_desc)
-    new_skills_json = combine_skills(usr_json, new_json)
-
+    skill_data_str = fetch_job_skills(job_description)
+    extracted_skills = json.loads(extract_text_segment(skill_data_str, "```json", "```"))
+    combined_skills = merge_skills(parsed_resume, extracted_skills)
     print("\n\nExtracted Job Skills")
 
-    job_experiencs_json = extract_job_experiences(job_description)
-    extracted_experiences = extract_between(job_experiencs_json, "```json", "```")
+    job_experience_str = fetch_job_relevant_experience(job_description)
+    extracted_experience = extract_text_segment(job_experience_str, "```json", "```")
+
     print("\n\nExtracted Job Experience")
+    aligned_experience = align_experience_with_job(extracted_experience, experience_section)
+    aligned_experience_json = json.loads(extract_text_segment(aligned_experience, "```json", "```"))
+    if not isinstance(aligned_experience_json, dict) or 'experience' not in map(str.lower, aligned_experience_json.keys()):
+        aligned_experience_json = {"experience": aligned_experience_json}
+    aligned_experience_json = {k.lower(): v for k, v in aligned_experience_json.items()}
 
-    align_experience_out = extract_aligned_experiences(extracted_experiences, experiences)
-    align_experience_json = extract_between(align_experience_out, "```json", "```")
-    align_experience_json = json.loads(align_experience_json)
-    if not isinstance(align_experience_json, dict) or 'experience' not in map(str.lower, align_experience_json.keys()):
-        align_experience_json = {"experience": align_experience_json}
-    align_experience_json = {k.lower(): v for k, v in align_experience_json.items()}
     print("\n\nExtracted Aligned Experience")
+    aligned_projects = align_projects_with_job(extracted_experience, project_section)
+    aligned_projects_json = json.loads(extract_text_segment(aligned_projects, "```json", "```"))
+    if not isinstance(aligned_projects_json, dict) or 'projects' not in map(str.lower, aligned_projects_json.keys()):
+        aligned_projects_json = {"projects": aligned_projects_json}
+    aligned_projects_json = {k.lower(): v for k, v in aligned_projects_json.items()}
 
+    final_resume = {
+        **combined_skills,
+        **aligned_experience_json,
+        **aligned_projects_json,
+        **education_section,
+    }
+    return json.dumps(final_resume, indent=4), extracted_experience
 
-    align_projects_out = extract_projects_experiences(extracted_experiences, user_projects)
-    align_projects_json = extract_between(align_projects_out, "```json", "```")
-    align_projects_json = json.loads(align_projects_json)
-    if not isinstance(align_projects_json, dict) or 'projects' not in map(str.lower, align_projects_json.keys()):
-        align_projects_json = {"projects": align_projects_json}
-    align_projects_json = {k.lower(): v for k, v in align_projects_json.items()}
-
-    combined_json = {**new_skills_json, **align_experience_json, **align_projects_json, **user_education_json}
-    combined_str = json.dumps(combined_json, indent=4)
-    return combined_str, extracted_experiences
-
-def execute_update_prompt(resume_str, llm_query):
+def update_resume_with_query(resume_content, update_query):
     template = f"""
     Resume:
-    {resume_str}
+    {resume_content}
 
     Query:
-    {llm_query}
+    {update_query}
     """
 
     system_message = """
@@ -181,8 +180,8 @@ def execute_update_prompt(resume_str, llm_query):
         {"role": "system", "content": system_message}, 
         {"role": "user", "content": template}, 
     ]
-    output = client.generate_output(model_name, messages)
-    output = extract_between(output, "```json", "```")
+    output = llm_client.generate_output(model_name, messages)
+    output = extract_text_segment(output, "```json", "```")
     return output
 
 def parse_evaluation_output(output):
@@ -191,15 +190,17 @@ def parse_evaluation_output(output):
         return stats
     except json.JSONDecodeError as e:
         return {"error": f"Invalid JSON output: {e}"}
-    return stats
 
-def evaluate_resume_to_job(job_desc, original, updated):
+def evaluate_resume_to_job(job_description, original, updated):
     template = f"""
     Resume One:
     {original}
 
     Resume Two:
     {updated}
+
+    Job Description:
+    {job_description}
     """
 
     system_message = """
@@ -216,5 +217,5 @@ def evaluate_resume_to_job(job_desc, original, updated):
         {"role": "user", "content": template}, 
     ]
 
-    output = client.generate_output(model_name, messages)
-    return extract_between(json.dumps(parse_evaluation_output(output)), "```json", "```") 
+    output = llm_client.generate_output(model_name, messages)
+    return extract_text_segment(json.dumps(parse_evaluation_output(output)), "```json", "```") 
