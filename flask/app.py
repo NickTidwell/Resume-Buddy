@@ -16,11 +16,13 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads/'
 app.config['ALLOWED_EXTENSIONS'] = {'txt', 'docx'}
 app.config["OUTPUT_PATH"] = 'outputs/output.jsonl'
+app.secret_key = 'SUPER_SECRET'
 
 embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
 loader = JSONLoader(file_path="./jobs.json", jq_schema=".jobs[].description", text_content=False)
 documents = loader.load()
 db = Chroma.from_documents(documents, embedding_function)
+
 def load_jobs():
     with open('jobs.json') as f:
         jobs = json.load(f)['jobs']
@@ -37,14 +39,18 @@ def job_list():
     parser = ResumeParser(resume_path)
     parser.parse()
     resume_str = parser.as_str()
-    docs = db.similarity_search(f"Select the best jobs for the candidate resume: {resume_str}", k=10)
+    docs = db.similarity_search(f"Select the best jobs for the candidate resume: {resume_str}. Focus on job titles, career progression, and relevant experience.", k=5)
+    itr = 0
+    for doc in docs:
+        index = doc.metadata['seq_num'] - 1
+        jobs[index]['recommended'] = 1
+        itr += 1
+    # Second pass: Move recommended jobs to the top of the list
+    recommended_jobs = [job for job in jobs if job.get('recommended') == 1]
+    non_recommended_jobs = [job for job in jobs if job.get('recommended') != 1]
 
-    for doc in reversed(docs):
-        index = doc.metadata['seq_num']
-        item = jobs.pop(index)
-        item['recommended'] = 1
-        jobs.insert(0, item)
-    
+    # Combine the lists with recommended jobs at the top
+    jobs = recommended_jobs + non_recommended_jobs
     page = request.args.get('page', 1, type=int)
     per_page = 5
     total = len(jobs)

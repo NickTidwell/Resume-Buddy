@@ -70,7 +70,7 @@ def fetch_job_relevant_experience(job_description ):
     output = llm_client.generate_output(model_name, messages)
     return output
 
-def align_experience_with_job(extracted_experience, resume_experiences ):
+def align_experience_with_job( extracted_experience, resume_experiences ):
     template = f"""
     Extracted Key Experiences:
     {extracted_experience}
@@ -79,7 +79,8 @@ def align_experience_with_job(extracted_experience, resume_experiences ):
     {resume_experiences}
     """
     system_message = """
-    You are an expert language model tasked with updating only the "experience" section of a resume based on key skills and experiences extracted from job descriptions. Each bullet point should be relevant, impactful, and clearly reflect the skills and experiences described in the key experiences. Ensure that each bullet point highlights specific achievements, quantifiable results, and the direct impact of the candidate's contributions. Emphasize the diversity of technologies and frameworks used, and ensure that the updated experience section demonstrates a broad and varied skill set. Output the revised "experience" section in JSON format, with no additional explanations. Do not change the structure, order, or formatting of the JSON. Only update the text within the existing structure. Do not add any additional text or comments. Ensure the JSON is valid and properly formatted."""
+    You are an expert language model tasked with updating only the "experience" section of a resume based on key skills and experiences extracted from job descriptions. Each bullet point should be relevant, impactful, and clearly reflect the skills and experiences described in the key experiences. Ensure that each bullet point highlights specific achievements, quantifiable results, and the direct impact of the candidate's contributions. Emphasize the diversity of technologies and frameworks used, and ensure that the updated experience section demonstrates a broad and varied skill set. Output the revised "experience" section in JSON format, with no additional explanations. Do not change the structure, order, or formatting of the JSON. Only update the text within the existing structure. Do not add any additional text or comments. Ensure the JSON is valid and properly formatted.
+    """
     messages = [ 
         {"role": "system", "content": system_message}, 
         {"role": "user", "content": template}, 
@@ -97,7 +98,7 @@ def align_projects_with_job(extracted_experience, resume_projects ):
     """
 
     system_message = """
-    You are an advanced language model tasked with extracting key components from a resume based on a given job description. Your objective is to categorize experiences into "Technical Skills," "Professional Experience," "Educational Background," "Soft Skills," "Industry Knowledge," and "Other Requirements." Ensure that each category is concise and relevant to the job description. Highlight specific achievements, quantifiable results, and the direct impact of the candidate's contributions. Emphasize the diversity of technologies and frameworks used, and ensure that the summarized experiences demonstrate a broad and varied skill set. If a category is not explicitly mentioned, infer the key components to the best of your ability, without adding any extra explanations.
+        You are an expert language model tasked with updating only the "projects" section of a resume based on key skills and experiences extracted from job descriptions. Each bullet point should be relevant, impactful, and clearly reflect the skills and experiences described in the key experiences. Ensure that each bullet point highlights specific achievements, quantifiable results, and the direct impact of the candidate's contributions. Emphasize the diversity of technologies and frameworks used, and ensure that the updated experience section demonstrates a broad and varied skill set. Output the revised "projects" section in JSON format, with no additional explanations. Do not change the structure, order, or formatting of the JSON. Only update the text within the existing structure. Do not add any additional text or comments. Ensure the JSON is valid and properly formatted.
     """
 
 
@@ -109,9 +110,20 @@ def align_projects_with_job(extracted_experience, resume_projects ):
     return output
 
 def merge_skills(existing_skills, new_skills):
-    languages_set = set(existing_skills["skills"]["languages:"].split(", "))
-    technologies_set = set(existing_skills["skills"]["technologies:"].split(", "))
-    frameworks_set = set(existing_skills["skills"]["frameworks:"].split(", "))
+    try:
+        languages_set = set(existing_skills["skills"]["languages:"].split(", "))
+    except KeyError:
+        languages_set = set()
+
+    try:
+        technologies_set = set(existing_skills["skills"]["technologies:"].split(", "))
+    except KeyError:
+        technologies_set = set()
+
+    try:
+        frameworks_set = set(existing_skills["skills"]["frameworks:"].split(", "))
+    except KeyError:
+        frameworks_set = set()
     # Add new skills to the respective sets
     languages_set.update(new_skills['Languages'])
     technologies_set.update(new_skills['Technologies'])

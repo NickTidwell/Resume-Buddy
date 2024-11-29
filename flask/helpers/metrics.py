@@ -1,9 +1,6 @@
-import numpy as np
 import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from nltk.translate.bleu_score import sentence_bleu
-from sklearn.metrics import f1_score
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from helpers.KeySkillsChainApi import evaluate_resume_to_job
 def compute_cosine_similarity(doc1, doc2):

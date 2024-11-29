@@ -6,7 +6,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 import time
 from urllib.parse import urlparse, parse_qs
 
-class LinkedInJobScraper:
+class LinkedInJobScraper:https://webcourses.ucf.edu/profile/settings
     def __init__(self, url):
         self.url = url
         self.driver = self._set_up_driver()
@@ -33,6 +33,7 @@ class LinkedInJobScraper:
             job_xpath = f'//*[@id="main"]/div/div[2]/div[1]/div/ul/li[{i}]'
             job = self.driver.find_element(By.XPATH, job_xpath)
             job.click()
+            time.sleep(0.1)
             anchor_elements = job.find_element(By.TAG_NAME, 'a')
             href = anchor_elements.get_attribute('href')
             job_title = anchor_elements.get_attribute('aria-label')
@@ -56,7 +57,10 @@ class LinkedInJobScraper:
         self.driver.quit()
 
 # Usage example:
-scraper = LinkedInJobScraper("https://www.linkedin.com/jobs/search/?keywords=Software%20Engineer&geoId=101318387&f_WT=2")
-scraper.scrape_jobs()
-scraper.save_jobs_to_json('jobs.json')
-scraper.close_driver()
+jobs_names = ["Financial Analyst", "Teacher", "Software Engineer", "Graphic Designer", "Registered Nurse", "Physical Therapist"]
+for job in jobs_names:
+    encoded_job = job.replace(' ', '%20')
+    scraper = LinkedInJobScraper(f"https://www.linkedin.com/jobs/search/?keywords={encoded_job}")
+    scraper.scrape_jobs()
+    scraper.save_jobs_to_json(f'{job}.json')
+    scraper.close_driver()
